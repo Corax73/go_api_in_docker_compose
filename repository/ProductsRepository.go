@@ -12,8 +12,8 @@ import (
 )
 
 type ProductsRepository struct {
-	Offset, Limit int
-	Order         string
+	Offset, Limit      int
+	Order, CustomError string
 }
 
 // ProductsRepository returns a pointer to the initiated repository instance.
@@ -22,6 +22,7 @@ func NewRepository() *ProductsRepository {
 		Offset: 0,
 		Limit:  20,
 		Order:  "price desc",
+		CustomError: "What went wrong, check your details in the request.",
 	}
 	return &rep
 }
@@ -31,7 +32,10 @@ func (rep *ProductsRepository) GetList() *[]map[string]interface{} {
 	data := []map[string]interface{}{}
 	database := customDb.GetConnect()
 	product := new(models.Product)
-	database.Model(product).Limit(rep.Limit).Offset(rep.Offset).Order(rep.Order).Find(&data)
+	result := database.Model(product).Limit(rep.Limit).Offset(rep.Offset).Order(rep.Order).Find(&data)
+	if result.Error != nil {
+		customLog.Logging(result.Error)
+	}
 	return &data
 }
 
@@ -40,7 +44,10 @@ func (rep *ProductsRepository) GetOne(uuid string) *[]map[string]interface{} {
 	database := customDb.GetConnect()
 	data := []map[string]interface{}{}
 	product := new(models.Product)
-	database.Model(product).Where("id = ?", uuid).First(&data)
+	result := database.Model(product).Where("id = ?", uuid).First(&data)
+	if result.Error != nil {
+		customLog.Logging(result.Error)
+	}
 	return &data
 
 }
@@ -88,4 +95,28 @@ func (rep *ProductsRepository) Create(data map[string]interface{}) (*models.Prod
 		}
 	}
 	return resp, err
+}
+
+// Delete
+func (rep *ProductsRepository) Delete(uuid string) bool {
+	var resp bool
+	if uuid != "" {
+		database := customDb.GetConnect()
+		product := new(models.Product)
+		tx := database.Begin()
+		res := tx.Where("id = ?", uuid).Delete(&product)
+		if res.Error == nil {
+			res := tx.Commit()
+			if res.Error == nil {
+				resp = true
+			} else {
+				tx.Rollback()
+				customLog.Logging(res.Error)
+			}
+		} else {
+			tx.Rollback()
+			customLog.Logging(res.Error)
+		}
+	}
+	return resp
 }

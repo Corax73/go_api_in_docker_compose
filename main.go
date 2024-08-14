@@ -29,7 +29,7 @@ func main() {
 				rep := repository.NewRepository()
 				resp, err := rep.Create(data)
 				if err != nil {
-					json.NewEncoder(w).Encode(err.Error())
+					json.NewEncoder(w).Encode(rep.CustomError)
 				} else {
 					json.NewEncoder(w).Encode(resp)
 				}
@@ -47,7 +47,21 @@ func main() {
 			rep := repository.NewRepository()
 			id := r.PathValue("id")
 			resp := rep.GetOne(id)
-			json.NewEncoder(w).Encode(resp)
+			var data interface{}
+			data = resp
+			if len(*resp) == 0 {
+				data = "Entry not found"
+			}
+			json.NewEncoder(w).Encode(data)
+		case http.MethodDelete:
+			rep := repository.NewRepository()
+			id := r.PathValue("id")
+			resp := rep.Delete(id)
+			data := "Entry deleted"
+			if !resp {
+				data = rep.CustomError
+			}
+			json.NewEncoder(w).Encode(data)
 		}
 	})
 
